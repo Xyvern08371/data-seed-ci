@@ -1,0 +1,40 @@
+name: data-seed
+
+# The Data seed must be created with Apple's APFS formatter (hdiutil); the Linux mkapfs image is
+# rejected by the iPadOS 27 APFS kext. This job runs on a macOS runner, uploads the packed seed
+# and the volume UUID the kernel configuration has to carry.
+on:
+  workflow_dispatch:
+    inputs:
+      gib:
+        description: 'Data container size in GiB'
+        required: false
+        default: '14'
+  push:
+    paths:
+      - '.github/workflows/data-seed.yml'
+      - 'scripts/make-data-seed-ci.py'
+      - 'scripts/seed-data-grow.py'
+
+jobs:
+  seed:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Create blank APFS Data seed
+        run: |
+          python3 scripts/make-data-seed-ci.py --gib "${{ inputs.gib || '14' }}" --output out/owner-data.dbr
+      - name: Report
+        run: |
+          ls -la out/
+          cat out/owner-data.dbr.uuid.txt
+          sha256sum out/owner-data.dbr | tee out/owner-data.dbr.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: owner-data-seed
+          path: out/
+          if-no-files-found: error
